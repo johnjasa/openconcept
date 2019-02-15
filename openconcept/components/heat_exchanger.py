@@ -1,6 +1,6 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent, Problem, IndepVarComp
+from openmdao.api import ExplicitComponent, Problem
 from openmdao.api import Group, ScipyOptimizeDriver
 
 class OffsetStripFinGeometry(ExplicitComponent):
@@ -97,7 +97,8 @@ class OffsetStripFinGeometry(ExplicitComponent):
         self.add_input('plate_thickness', val=0.0002, units='m')
         self.add_input('case_thickness', val=0.002, units='m')
 
-        self.add_input('n_wide_cold', val=100)
+        self.add_input('frontal_area', units='m**2')
+        # self.add_input('n_wide_cold', val=100)
         self.add_input('n_long_cold', val=3)
         self.add_input('n_tall', val=20)
         self.add_input('material_rho', val=2700.0, units='kg/m**3')
@@ -106,7 +107,8 @@ class OffsetStripFinGeometry(ExplicitComponent):
         self.add_output('length_overall', units='m')
         self.add_output('height_overall', units='m')
         self.add_output('width_overall', units='m')
-        self.add_output('frontal_area', units='m**2')
+        # self.add_output('frontal_area', units='m**2')
+        self.add_output('n_wide_cold', val=100)
 
         self.add_output('xs_area_cold', units='m**2')
         self.add_output('heat_transfer_area_cold', units='m**2')
@@ -137,25 +139,29 @@ class OffsetStripFinGeometry(ExplicitComponent):
         w_c = inputs['channel_width_cold']
         h_c = inputs['channel_height_cold']
         l_c = inputs['fin_length_cold']
-        n_wide_c = inputs['n_wide_cold']
+        # n_wide_c = inputs['n_wide_cold']
         n_long_c = inputs['n_long_cold']
 
         w_h = inputs['channel_width_hot']
         h_h = inputs['channel_height_hot']
         l_h = inputs['fin_length_hot']
 
+        frontal_area = inputs['frontal_area']
+
         # compute overall properties
         outputs['height_overall'] = (2 * (t_f + t_p) + h_c + h_h) * n_tall
+        n_wide_c = frontal_area / outputs['height_overall'] / (t_f + w_c)
+        outputs['n_wide_cold'] = n_wide_c
         outputs['width_overall'] = (t_f + w_c) * n_wide_c
         outputs['length_overall'] = l_c * n_long_c
-        outputs['frontal_area'] = outputs['width_overall'] * outputs['height_overall']
+        # frontal_area = outputs['width_overall'] * outputs['height_overall']
 
         # compute cold side geometric properties
         outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
         outputs['xs_area_cold'] = w_c * h_c * n_wide_c * n_tall
         outputs['heat_transfer_area_cold'] = 2 * (w_c + h_c) * l_c * n_long_c * n_wide_c * n_tall
         outputs['fin_area_ratio_cold'] = h_c / (h_c + w_c)
-        outputs['contraction_ratio_cold'] = outputs['xs_area_cold'] / outputs['frontal_area']
+        outputs['contraction_ratio_cold'] = outputs['xs_area_cold'] / frontal_area
         outputs['alpha_cold'] = w_c / h_c
         outputs['delta_cold'] = t_f / l_c
         outputs['gamma_cold'] = t_f / w_c
@@ -1153,176 +1159,46 @@ class PressureDrop(ExplicitComponent):
         J['delta_p_hot', 'width_overall'] = dyn_press_hot * (-4 * inputs['f_hot'] / inputs['dh_hot'])
         J['delta_p_hot', 'dh_hot'] = dyn_press_hot * (4*inputs['width_overall']*inputs['f_hot']/inputs['dh_hot']**2)
 
-class HXTestGroup(Group):
-    """
-    A heat exchanger model for use with the duct models
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
-
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        iv = self.add_subsystem('iv', IndepVarComp(), promotes_outputs=['*'])
-        iv.add_output('case_thickness', val=2.0, units='mm')
-        iv.add_output('fin_thickness', val=0.102, units='mm')
-        iv.add_output('plate_thickness', val=0.2, units='mm')
-        iv.add_output('material_k', val=190, units='W/m/K')
-        iv.add_output('material_rho', val=2700, units='kg/m**3')
-
-        #iv.add_output('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
-        #iv.add_output('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
-
-        iv.add_output('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
-        iv.add_output('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
-
-        #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
-        iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
-        iv.add_output('n_long_cold', val=3)
-        iv.add_output('n_wide_cold', val=430)
-        iv.add_output('n_tall', val=19)
-
-        iv.add_output('channel_height_cold', val=14, units='mm')
-        iv.add_output('channel_width_cold', val=1.35, units='mm')
-        iv.add_output('fin_length_cold', val=6, units='mm')
-        #iv.add_output('cp_cold', val=1005, units='J/kg/K')
-        iv.add_output('k_cold', val=0.02596, units='W/m/K')
-        iv.add_output('mu_cold', val=1.789e-5, units='kg/m/s')
-
-        iv.add_output('channel_height_hot', val=1, units='mm')
-        iv.add_output('channel_width_hot', val=1, units='mm')
-        iv.add_output('fin_length_hot', val=6, units='mm')
-        iv.add_output('cp_hot', val=3801, units='J/kg/K')
-        iv.add_output('k_hot', val=0.405, units='W/m/K')
-        iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
 
 
+if __name__ == '__main__':
+        # run this script from the root openconcept directory like so:
+        # python .\openconcept\components\heat_exchanger.py
+        import sys, os
+        sys.path.insert(0,os.getcwd())
+        from openconcept.components.tests.test_heat_exchanger import OSFGeometryTestGroup
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['tol'] = 1e-7
 
-        self.add_subsystem('osfgeometry', OffsetStripFinGeometry(), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('redh', HydraulicDiameterReynoldsNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('osfdata', OffsetStripFinData(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('nusselt', NusseltFromColburnJ(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('convection', ConvectiveCoefficient(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('finefficiency', FinEfficiency(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('ua', UAOverall(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('ntu', NTUMethod(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('effectiveness', CrossFlowNTUEffectiveness(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('heat', NTUEffectivenessActualHeatTransfer(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('t_out', OutletTemperatures(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('delta_p', PressureDrop(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-
-class HXGroup(Group):
-    """
-    A heat exchanger model for use with the duct models
-    Note that there are many design variables defined as dvs which could be varied
-    in optimization.
-
-    Inputs
-    ------
-    mdot_cold : float
-        Mass flow rate of the cold side (air) (vector, kg/s)
-    T_in_cold : float
-        Inflow temperature of the cold side (air) (vector, K)
-    rho_cold : float
-        Inflow density of the cold side (air) (vector, kg/m**3)
-    mdot_hot : float
-        Mass flow rate of the hot die (liquid) (vector, kg/s)
-    T_in_hot : float
-        Inflow temperature of the hot side (liquid) (vector, kg/s)
-    rho_hot : float
-        Inflow density of the hot side (liquid) (vector, kg/m**3)
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
-
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['*'])
-        iv.add_output('case_thickness', val=2.0, units='mm')
-        iv.add_output('fin_thickness', val=0.102, units='mm')
-        iv.add_output('plate_thickness', val=0.2, units='mm')
-        iv.add_output('material_k', val=190, units='W/m/K')
-        iv.add_output('material_rho', val=2700, units='kg/m**3')
-
-        #iv.add_output('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
-        #iv.add_output('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
-        #iv.add_output('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
-        #iv.add_output('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
-
-        #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
-        #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
-        iv.add_output('n_long_cold', val=3)
-        iv.add_output('n_wide_cold', val=430)
-        iv.add_output('n_tall', val=19)
-
-        iv.add_output('channel_height_cold', val=14, units='mm')
-        iv.add_output('channel_width_cold', val=1.35, units='mm')
-        iv.add_output('fin_length_cold', val=6, units='mm')
-        iv.add_output('cp_cold', val=1005, units='J/kg/K')
-        iv.add_output('k_cold', val=0.02596, units='W/m/K')
-        iv.add_output('mu_cold', val=1.789e-5, units='kg/m/s')
-
-        iv.add_output('channel_height_hot', val=1, units='mm')
-        iv.add_output('channel_width_hot', val=1, units='mm')
-        iv.add_output('fin_length_hot', val=6, units='mm')
-        iv.add_output('cp_hot', val=3801, units='J/kg/K')
-        iv.add_output('k_hot', val=0.405, units='W/m/K')
-        iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
+        prob.model.add_design_var('channel_width_hot',lower=1,upper=20)
+        prob.model.add_design_var('channel_height_hot',lower=1,upper=20)
+        prob.model.add_design_var('fin_length_hot',lower=6,upper=20)
+        prob.model.add_design_var('channel_width_cold',lower=1,upper=20)
+        prob.model.add_design_var('channel_height_cold',lower=1,upper=20)
+        prob.model.add_design_var('fin_length_cold',lower=6,upper=20)
+        prob.model.add_design_var('n_wide_cold',lower=6,upper=1000)
+        prob.model.add_design_var('n_long_cold',lower=3,upper=1000)
+        prob.model.add_design_var('n_tall',lower=3,upper=1000)
+        prob.model.add_design_var('mdot_cold',lower=0.01,upper=10)
+        prob.model.add_design_var('mdot_hot',lower=0.01,upper=10)
 
 
+        prob.model.add_constraint('dh_cold',lower=0.001)
+        prob.model.add_constraint('dh_hot',lower=0.001)
+        prob.model.add_constraint('delta_p_cold', lower=-150)
+        prob.model.add_constraint('heat_transfer', lower=10000.)
+        prob.model.add_constraint('T_out_hot', upper=55+273.15)
 
-        self.add_subsystem('osfgeometry', OffsetStripFinGeometry(), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('redh', HydraulicDiameterReynoldsNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('osfdata', OffsetStripFinData(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('nusselt', NusseltFromColburnJ(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('convection', ConvectiveCoefficient(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('finefficiency', FinEfficiency(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('ua', UAOverall(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('ntu', NTUMethod(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('effectiveness', CrossFlowNTUEffectiveness(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('heat', NTUEffectivenessActualHeatTransfer(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('t_out', OutletTemperatures(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
-        self.add_subsystem('delta_p', PressureDrop(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        prob.model.add_objective('component_weight')
+        prob.setup(check=True,force_alloc_complex=True)
+        prob.run_model()
+        # prob.check_partials(method='cs', compact_print=True)
+        prob.run_driver()
+        prob.model.list_inputs()
+        prob.model.list_outputs()
+        check = prob.get_val('heat.heat_transfer')
+        check2 = prob.get_val('delta_p_cold')
 
-# if __name__ == '__main__':
-#         # run this script from the root openconcept directory like so:
-#         # python .\openconcept\components\heat_exchanger.py
-#         import sys, os
-#         sys.path.insert(0,os.getcwd())
-#         from openconcept.components.tests.test_heat_exchanger import OSFGeometryTestGroup
-#         prob = Problem(OSFGeometryTestGroup(num_nodes=1))
-#         prob.driver = ScipyOptimizeDriver()
-#         prob.driver.options['tol'] = 1e-7
-
-#         prob.model.add_design_var('channel_width_hot',lower=1,upper=20)
-#         prob.model.add_design_var('channel_height_hot',lower=1,upper=20)
-#         prob.model.add_design_var('fin_length_hot',lower=6,upper=20)
-#         prob.model.add_design_var('channel_width_cold',lower=1,upper=20)
-#         prob.model.add_design_var('channel_height_cold',lower=1,upper=20)
-#         prob.model.add_design_var('fin_length_cold',lower=6,upper=20)
-#         prob.model.add_design_var('n_wide_cold',lower=6,upper=1000)
-#         prob.model.add_design_var('n_long_cold',lower=3,upper=1000)
-#         prob.model.add_design_var('n_tall',lower=3,upper=1000)
-#         prob.model.add_design_var('mdot_cold',lower=0.01,upper=10)
-#         prob.model.add_design_var('mdot_hot',lower=0.01,upper=10)
-
-
-#         prob.model.add_constraint('dh_cold',lower=0.001)
-#         prob.model.add_constraint('dh_hot',lower=0.001)
-#         prob.model.add_constraint('delta_p_cold', lower=-150)
-#         prob.model.add_constraint('heat_transfer', lower=10000.)
-#         prob.model.add_constraint('T_out_hot', upper=55+273.15)
-
-#         prob.model.add_objective('component_weight')
-#         prob.setup(check=True,force_alloc_complex=True)
-#         prob.run_model()
-#         # prob.check_partials(method='cs', compact_print=True)
-#         prob.run_driver()
-#         prob.model.list_inputs()
-#         prob.model.list_outputs()
-#         check = prob.get_val('heat.heat_transfer')
-#         check2 = prob.get_val('delta_p_cold')
-
-#         print(check)
-#         print(check2)
+        print(check)
+        print(check2)
