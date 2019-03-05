@@ -502,6 +502,9 @@ if __name__ == '__main__':
     print(np.max(prob['component.T_object']-273.15))
     print(np.max(-prob['duct.force.F_net']))
 
+    print()
+    prob.model.list_outputs(print_arrays=True)
+
     #prob.check_partials(method='cs', compact_print=True)
 
     #prob.model.list_outputs(units=True, print_arrays=True)

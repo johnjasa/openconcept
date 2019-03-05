@@ -1259,7 +1259,8 @@ class HXGroup(Group):
         #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
         #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
         iv.add_output('n_long_cold', val=3)
-        iv.add_output('n_wide_cold', val=430)
+        # iv.add_output('n_wide_cold', val=430)
+        iv.add_output('frontal_area', val=50000, units='mm**2')
         iv.add_output('n_tall', val=19)
 
         iv.add_output('channel_height_cold', val=14, units='mm')
