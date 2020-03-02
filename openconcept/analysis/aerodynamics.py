@@ -142,34 +142,40 @@ class StallSpeed(ExplicitComponent):
     Vstall_eas : float
         Stall speed (scalar, m/s)
     """
+    def initialize(self):
+        self.options.declare('num_nodes',default=1)
+
 
     def setup(self):
+        nn = self.options['num_nodes']
         self.add_input('weight', units='kg')
         self.add_input('ac|geom|wing|S_ref', units='m**2')
         self.add_input('CLmax')
-        self.add_output('Vstall_eas', units='m/s')
+        self.add_output('Vstall_eas', units='m/s', shape=(nn,))
         self.declare_partials(['Vstall_eas'], ['weight', 'ac|geom|wing|S_ref', 'CLmax'])
 
     def compute(self, inputs, outputs):
+        nn = self.options['num_nodes']
         g = 9.80665  # m/s^2
         rho = 1.225  # kg/m3
         outputs['Vstall_eas'] = np.sqrt(2 * inputs['weight'] * g / rho /
-                                        inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])
+                                        inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])*np.ones((nn,))
 
     def compute_partials(self, inputs, J):
+        nn = self.options['num_nodes']
         g = 9.80665  # m/s^2
         rho = 1.225  # kg/m3
         J['Vstall_eas', 'weight'] = (1 / np.sqrt(2 * inputs['weight'] * g / rho /
                                                  inputs['ac|geom|wing|S_ref'] / inputs['CLmax']) *
-                                     g / rho / inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])
+                                     g / rho / inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])*np.ones((nn,))
         J['Vstall_eas', 'ac|geom|wing|S_ref'] = - (1 / np.sqrt(2 * inputs['weight'] * g / rho /
                                                                inputs['ac|geom|wing|S_ref'] /
                                                                inputs['CLmax']) *
                                                    inputs['weight'] * g / rho /
                                                    inputs['ac|geom|wing|S_ref'] ** 2 /
-                                                   inputs['CLmax'])
+                                                   inputs['CLmax'])*np.ones((nn,))
         J['Vstall_eas', 'CLmax'] = - (1 / np.sqrt(2 * inputs['weight'] * g / rho /
                                                   inputs['ac|geom|wing|S_ref'] /
                                                   inputs['CLmax']) *
                                       inputs['weight'] * g / rho /
-                                      inputs['ac|geom|wing|S_ref'] / inputs['CLmax'] ** 2)
+                                      inputs['ac|geom|wing|S_ref'] / inputs['CLmax'] ** 2)*np.ones((nn,))

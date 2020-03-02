@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Problem, IndepVarComp
 from openmdao.api import Group, ScipyOptimizeDriver
+from openconcept.utilities.dvlabel import DVLabel
 
 class OffsetStripFinGeometry(ExplicitComponent):
     """
@@ -97,8 +98,7 @@ class OffsetStripFinGeometry(ExplicitComponent):
         self.add_input('plate_thickness', val=0.0002, units='m')
         self.add_input('case_thickness', val=0.002, units='m')
 
-        self.add_input('frontal_area', units='m**2')
-        # self.add_input('n_wide_cold', val=100)
+        self.add_input('n_wide_cold', val=100)
         self.add_input('n_long_cold', val=3)
         self.add_input('n_tall', val=20)
         self.add_input('material_rho', val=2700.0, units='kg/m**3')
@@ -107,8 +107,7 @@ class OffsetStripFinGeometry(ExplicitComponent):
         self.add_output('length_overall', units='m')
         self.add_output('height_overall', units='m')
         self.add_output('width_overall', units='m')
-        # self.add_output('frontal_area', units='m**2')
-        self.add_output('n_wide_cold', val=100)
+        self.add_output('frontal_area', units='m**2')
 
         self.add_output('xs_area_cold', units='m**2')
         self.add_output('heat_transfer_area_cold', units='m**2')
@@ -139,29 +138,25 @@ class OffsetStripFinGeometry(ExplicitComponent):
         w_c = inputs['channel_width_cold']
         h_c = inputs['channel_height_cold']
         l_c = inputs['fin_length_cold']
-        # n_wide_c = inputs['n_wide_cold']
+        n_wide_c = inputs['n_wide_cold']
         n_long_c = inputs['n_long_cold']
 
         w_h = inputs['channel_width_hot']
         h_h = inputs['channel_height_hot']
         l_h = inputs['fin_length_hot']
 
-        frontal_area = inputs['frontal_area']
-
         # compute overall properties
         outputs['height_overall'] = (2 * (t_f + t_p) + h_c + h_h) * n_tall
-        n_wide_c = frontal_area / outputs['height_overall'] / (t_f + w_c)
-        outputs['n_wide_cold'] = n_wide_c
         outputs['width_overall'] = (t_f + w_c) * n_wide_c
         outputs['length_overall'] = l_c * n_long_c
-        # frontal_area = outputs['width_overall'] * outputs['height_overall']
+        outputs['frontal_area'] = outputs['width_overall'] * outputs['height_overall']
 
         # compute cold side geometric properties
         outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
         outputs['xs_area_cold'] = w_c * h_c * n_wide_c * n_tall
         outputs['heat_transfer_area_cold'] = 2 * (w_c + h_c) * l_c * n_long_c * n_wide_c * n_tall
         outputs['fin_area_ratio_cold'] = h_c / (h_c + w_c)
-        outputs['contraction_ratio_cold'] = outputs['xs_area_cold'] / frontal_area
+        outputs['contraction_ratio_cold'] = outputs['xs_area_cold'] / outputs['frontal_area']
         outputs['alpha_cold'] = w_c / h_c
         outputs['delta_cold'] = t_f / l_c
         outputs['gamma_cold'] = t_f / w_c
@@ -1260,7 +1255,6 @@ class HXGroup(Group):
         #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
         iv.add_output('n_long_cold', val=3)
         # iv.add_output('n_wide_cold', val=430)
-        iv.add_output('frontal_area', val=50000, units='mm**2')
         iv.add_output('n_tall', val=19)
 
         iv.add_output('channel_height_cold', val=14, units='mm')
@@ -1277,6 +1271,9 @@ class HXGroup(Group):
         iv.add_output('k_hot', val=0.405, units='W/m/K')
         iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
 
+        dvlist = [['ac|propulsion|thermal|hx|n_wide_cold', 'n_wide_cold', 430, None]]
+
+        self.add_subsystem('dvpassthru',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
 
 
         self.add_subsystem('osfgeometry', OffsetStripFinGeometry(), promotes_inputs=['*'], promotes_outputs=['*'])

@@ -77,7 +77,7 @@ def propeller_map_highpower(vec_size=1):
 
     data[:,0] = np.zeros(13)
     # Create regular grid interpolator instance
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=False,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp', 0.3, cp)
     interp.add_input('J', 1, J)
     interp.add_output('eta_prop', 0.8, data)

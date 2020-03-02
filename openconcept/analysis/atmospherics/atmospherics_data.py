@@ -51,6 +51,8 @@ def compute_pressures(h_m, tropos_mask, strato_mask, smooth_mask):
     a, b, c, d = pressure_coeffs
 
     p_Pa = np.zeros(len(h_m), dtype=type(h_m[0]))
+    if np.max(h_m) > 15000:
+        print('ALTITUDE: '+str(h_m))
     p_Pa += tropos_mask * (101325*(1-0.0065*h_m/288.16)**5.2561)
     p_Pa += strato_mask * (22632*np.exp(-9.81*(h_m-h_trans)/(288*216.65)))
     p_Pa += smooth_mask * (a*h_m**3 + b*h_m**2 + c*h_m + d)
